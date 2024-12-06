@@ -26,7 +26,13 @@ func (e *Engine) SetupRoutes() {
 	// mux.HandleFunc("/subreddit", e.HandleCreateSubreddit)
 	// return mux
 	e.router.HandleFunc("/register", e.HandleRegisterUser)
-	e.router.HandleFunc("/subreddit", e.HandleCreateSubreddit)
+	e.router.HandleFunc("/createsub", e.HandleCreateSubreddit)
+	e.router.HandleFunc("/joinsub", e.HandleJoinSubreddit)
+	e.router.HandleFunc("/leavesub", e.HandleLeaveSubreddit)
+	e.router.HandleFunc("/createpost", e.HandleCreatePost)
+	e.router.HandleFunc("/createcomment", e.HandleCreateComment)
+	e.router.HandleFunc("/vote", e.HandleVote)
+
 	// Add more routes here
 }
 
@@ -41,14 +47,6 @@ func NewEngine() *Engine {
 	e.SetupRoutes()
 	return e
 }
-
-// func (e *Engine) StartServer(addr string) error {
-// 	e.server = &http.Server{
-// 		Addr:    addr,
-// 		Handler: e.SetupRoutes(),
-// 	}
-// 	return e.server.ListenAndServe()
-// }
 
 func (e *Engine) Receive(context actor.Context) {
 	switch msg := context.Message().(type) {
@@ -70,7 +68,6 @@ func (e *Engine) Receive(context actor.Context) {
 	case *CreatePost:
 		e.createPost(msg.PostID, msg.SubredditName, msg.Author, msg.Title, msg.Content)
 	case *CreateComment:
-		// e.createComment(msg.PostID, msg.Author, msg.Content)
 		e.createComment(msg.PostID, msg.ParentID, msg.CommentID, msg.Author, msg.Content)
 	case *Vote:
 		e.vote(msg.PostID, msg.UserID, msg.IsUpvote)
@@ -87,23 +84,7 @@ func (e *Engine) Receive(context actor.Context) {
 	}
 }
 
-func (e *Engine) HandleRegisterUser1(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var user struct {
-		Username string `json:"username"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	e.registerUser(user.Username)
-	w.WriteHeader(http.StatusOK)
-}
-
+// Request handlers
 func (e *Engine) HandleRegisterUser(w http.ResponseWriter, r *http.Request) {
 	var user struct {
 		Username string `json:"username"`
@@ -122,7 +103,8 @@ func (e *Engine) HandleRegisterUser(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"message": "User registered successfully"})
+	msg_str := fmt.Sprintf("User u/%s registered", user.Username)
+	json.NewEncoder(w).Encode(map[string]string{"message": msg_str})
 }
 
 func (e *Engine) HandleCreateSubreddit(w http.ResponseWriter, r *http.Request) {
@@ -130,42 +112,188 @@ func (e *Engine) HandleCreateSubreddit(w http.ResponseWriter, r *http.Request) {
 		Name    string `json:"name"`
 		Creator string `json:"creator"`
 	}
+	var response struct {
+		msg string
+	}
 	if err := json.NewDecoder(r.Body).Decode(&subreddit); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	e.createSubreddit(subreddit.Name, subreddit.Creator)
-	w.WriteHeader(http.StatusOK)
+	errs := e.createSubreddit(subreddit.Name, subreddit.Creator)
+	if errs != nil {
+		w.WriteHeader(http.StatusFailedDependency)
+		msg := fmt.Sprintf("r/%s could not be created as u/%s does not exist.", subreddit.Name, subreddit.Creator)
+		response.msg = msg
+	} else {
+		msg := fmt.Sprintf("r/%s created by u/%s.", subreddit.Name, subreddit.Creator)
+		w.WriteHeader(http.StatusCreated)
+		w.Header().Set("Content-Type", "application/json")
+		response.msg = msg
+
+	}
+	json.NewEncoder(w).Encode(map[string]string{"message": response.msg})
 }
+
+func (e *Engine) HandleJoinSubreddit(w http.ResponseWriter, r *http.Request) {
+	var joinsub struct {
+		SubName string
+		User    string
+	}
+	var response struct {
+		msg string
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&joinsub); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	errs := e.joinSubreddit(joinsub.SubName, joinsub.User)
+	if errs != nil {
+		w.WriteHeader(http.StatusFailedDependency)
+		msg := fmt.Sprintf("Join Subreddit could not be complete because: %s", errs)
+		response.msg = msg
+	} else {
+		msg := fmt.Sprintf("r/%s joined by u/%s ", joinsub.SubName, joinsub.User)
+		w.WriteHeader(http.StatusCreated)
+		w.Header().Set("Content-Type", "application/json")
+		response.msg = msg
+
+	}
+	json.NewEncoder(w).Encode(map[string]string{"message": response.msg})
+
+}
+func (e *Engine) HandleLeaveSubreddit(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		SubName string
+		User    string
+	}
+	var response struct {
+		msg string
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	errs := e.leaveSubreddit(request.SubName, request.User)
+	if errs != nil {
+		w.WriteHeader(http.StatusFailedDependency)
+		msg := fmt.Sprintf("Leave Subreddit could not be complete because: %s", errs)
+		response.msg = msg
+	} else {
+		msg := fmt.Sprintf("r/%s left by u/%s ", request.SubName, request.User)
+		w.WriteHeader(http.StatusCreated)
+		w.Header().Set("Content-Type", "application/json")
+		response.msg = msg
+
+	}
+	json.NewEncoder(w).Encode(map[string]string{"message": response.msg})
+
+}
+func (e *Engine) HandleCreatePost(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		SubredditName string `json:"subredditName"`
+		Author        string `json:"author"`
+		Title         string `json:"title"`
+		Content       string `json:"content"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	postID := fmt.Sprintf("Post %d", len(e.posts)+1)
+	errs := e.createPost(postID, request.SubredditName, request.Author, request.Title, request.Content)
+	if errs != nil {
+		w.WriteHeader(http.StatusFailedDependency)
+		json.NewEncoder(w).Encode(map[string]string{"error": errs.Error()})
+	} else {
+		w.WriteHeader(http.StatusCreated)
+		msg := fmt.Sprintf("u/%s made a post to r/%s. PostID: %s", request.Author, request.SubredditName, postID)
+		json.NewEncoder(w).Encode(map[string]string{"message": msg})
+	}
+}
+
+func (e *Engine) HandleCreateComment(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		PostID   string `json:"postID"`
+		ParentID string `json:"parentID"`
+		Author   string `json:"author"`
+		Content  string `json:"content"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	commentID := fmt.Sprintf("Comment%d", len(e.posts[request.PostID].Comments)+1)
+	err := e.createComment(request.PostID, request.ParentID, commentID, request.Author, request.Content)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+	} else {
+		w.WriteHeader(http.StatusCreated)
+		msg := fmt.Sprintf("u/%s commented on post %s", request.Author, request.PostID)
+		json.NewEncoder(w).Encode(map[string]string{"message": msg, "commentID": commentID})
+	}
+}
+func (e *Engine) HandleVote(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		PostID   string `json:"postID"`
+		UserID   string `json:"userID"`
+		IsUpvote bool   `json:"isUpvote"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err := e.vote(request.PostID, request.UserID, request.IsUpvote)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+	} else {
+		w.WriteHeader(http.StatusOK)
+		voteType := "upvoted"
+		if !request.IsUpvote {
+			voteType = "downvoted"
+		}
+		msg := fmt.Sprintf("User %s %s post %s", request.UserID, voteType, request.PostID)
+		json.NewEncoder(w).Encode(map[string]string{"message": msg})
+	}
+}
+
+// Functions
 func (e *Engine) registerUser(username string) error {
 	if _, exists := e.users[username]; exists {
 		return fmt.Errorf("user already exists")
 	}
 	e.users[username] = &User{Username: username, Karma: 0}
+	fmt.Printf("u/%s registered!\n", username)
 	e.logUserAction(username, "[REGISTER USER] Registered as new user")
 	return nil
 }
 
-// func (e *Engine) registerUser(username string) {
-// 	if _, exists := e.users[username]; !exists {
-// 		e.users[username] = &User{Username: username, Karma: 0}
-// 		e.logUserAction(username, "[REGISTER USER]  Registerd as new user")
-// 	} else {
-// 		fmt.Printf("The user : %s already exists!", username)
-// 	}
-// }
-
-func (e *Engine) createSubreddit(name, creator string) {
+func (e *Engine) createSubreddit(name, creator string) error {
 	if _, exists := e.subreddits[name]; !exists {
-		e.subreddits[name] = &Subreddit{Name: name, Creator: creator, Members: []string{creator}}
-		//fmt.Printf("[CREATE SUB] Subreddit created: %s by %s\n", name, creator)
-		log_str := fmt.Sprintf("[CREATE SUB]     Subreddit created: %s by %s", name, creator)
-
-		e.logUserAction(creator, log_str)
+		if _, userExists := e.users[creator]; userExists { //only create sub if user exists
+			e.subreddits[name] = &Subreddit{Name: name, Creator: creator, Members: []string{creator}}
+			//fmt.Printf("[CREATE SUB] Subreddit created: %s by %s\n", name, creator)
+			log_str := fmt.Sprintf("[CREATE SUB]     Subreddit created: %s by %s", name, creator)
+			e.logUserAction(creator, log_str)
+			return nil
+		}
 	}
+	return fmt.Errorf("the user does not exist, therefore subreddit cannot be created")
 }
 
-func (e *Engine) joinSubreddit(subredditName, username string) {
+func (e *Engine) joinSubreddit(subredditName, username string) error {
 	if subreddit, exists := e.subreddits[subredditName]; exists {
 		if user, userExists := e.users[username]; userExists {
 			if !contains(subreddit.Members, username) {
@@ -174,12 +302,17 @@ func (e *Engine) joinSubreddit(subredditName, username string) {
 				//fmt.Printf("[JOIN SUB] %s joined subreddit %s\n", username, subredditName)
 				log_str := fmt.Sprintf("[JOIN SUB]       %s joined subreddit %s", username, subredditName)
 				e.logUserAction(username, log_str)
+				return nil
 			}
-		}
-	}
-}
+		} else {
+			return fmt.Errorf("u/%s does not exist", username)
 
-func (e *Engine) leaveSubreddit(subredditName, username string) {
+		}
+
+	}
+	return fmt.Errorf("r/%s does not exist", subredditName)
+}
+func (e *Engine) leaveSubreddit(subredditName, username string) error {
 	if subreddit, exists := e.subreddits[subredditName]; exists {
 		if user, userExists := e.users[username]; userExists {
 			if contains(subreddit.Members, username) {
@@ -189,94 +322,173 @@ func (e *Engine) leaveSubreddit(subredditName, username string) {
 				log_str := fmt.Sprintf("[LEAVE SUB]      %s left subreddit %s", username, subredditName)
 
 				e.logUserAction(username, log_str)
+				return nil
 			}
-		}
-	}
-}
-
-func (e *Engine) createPost(postID, subredditName, author, title, content string) {
-	if _, exists := e.subreddits[subredditName]; exists {
-
-		e.posts[postID] = &Post{ID: postID, SubredditName: subredditName, Author: author, Title: title, Content: content}
-		// by default upvote for post by author when posted & increased karma
-		post := e.posts[postID]
-		post.Upvotes++
-		e.users[post.Author].Karma++
-		// fmt.Printf("[POST] Post created in %s by %s: %s\n", subredditName, author, title)
-		log_str := fmt.Sprintf("[POST]           %s created in %s by %s: %s", postID, subredditName, author, title)
-
-		e.logUserAction(author, log_str)
-		// }
-	}
-}
-
-func (e *Engine) createComment(postID, parentID, commentID, author, content string) {
-	if post, exists := e.posts[postID]; exists {
-		newComment := &Comment{ID: commentID, ParentID: parentID, Author: author, Content: content}
-
-		if parentID == postID {
-			post.Comments = append(post.Comments, newComment)
-			e.users[author].Karma++
 		} else {
-			// fmt.Println(("Adding Child Comment"))
-			e.addChildComment(post.Comments, parentID, author, newComment)
+			return fmt.Errorf("u/%s does not exist", username)
+
 		}
 
-		log_str := fmt.Sprintf("[POST Comment]   %s commented on post %s: %s", author, postID, content)
-		e.logUserAction(author, log_str)
 	}
+	return fmt.Errorf("r/%s does not exist", subredditName)
 }
 
-func (e *Engine) addChildComment(comments []*Comment, parentID string, author string, newComment *Comment) {
+func (e *Engine) createPost(postID, subredditName, author, title, content string) error {
+	if _, exists := e.subreddits[subredditName]; exists {
+		fmt.Printf("Creating a post in %s\n", subredditName)
+		if _, userExists := e.users[author]; userExists {
+			fmt.Printf("Author %s Verified", author)
+			e.posts[postID] = &Post{ID: postID, SubredditName: subredditName, Author: author, Title: title, Content: content}
+			// by default upvote for post by author when posted & increased karma
+			post := e.posts[postID]
+			post.Upvotes++
+			e.users[post.Author].Karma++
+			// fmt.Printf("[POST] Post created in %s by %s: %s\n", subredditName, author, title)
+			log_str := fmt.Sprintf("[POST]           %s created in %s by %s: %s", postID, subredditName, author, title)
+
+			e.logUserAction(author, log_str)
+			return nil
+		} else {
+			return fmt.Errorf("u/%s does not exist", author)
+		}
+	}
+	fmt.Printf("Searching for %s", subredditName)
+	return fmt.Errorf("r/%s does not exist", subredditName)
+
+}
+
+func (e *Engine) createComment(postID, parentID, commentID, author, content string) error {
+	if post, exists := e.posts[postID]; exists {
+		if _, userExists := e.users[author]; userExists {
+			newComment := &Comment{ID: commentID, ParentID: parentID, Author: author, Content: content}
+
+			if parentID == postID {
+				post.Comments = append(post.Comments, newComment)
+				e.users[author].Karma++
+			} else {
+
+				if !e.addChildComment(post.Comments, parentID, author, newComment) {
+					return fmt.Errorf("parent comment %s does not exist", parentID)
+				}
+			}
+
+			log_str := fmt.Sprintf("[POST Comment]   %s commented on post %s: %s", author, postID, content)
+			e.logUserAction(author, log_str)
+			return nil
+		}
+		return fmt.Errorf("u/%s does not exist", author)
+	}
+	return fmt.Errorf("post %s does not exist", postID)
+}
+
+// func (e *Engine) addChildComment(comments []*Comment, parentID string, author string, newComment *Comment) {
+// 	for _, comment := range comments {
+// 		if comment.ID == parentID {
+// 			commentReply := fmt.Sprintf("Reply %d to %s", len(comment.Children)+1, comment.ID)
+// 			newComment.Content = commentReply
+// 			comment.Children = append(comment.Children, newComment)
+// 			// log_str := fmt.Sprintf("[POST Comment]   %s commented on comment %s: %s", author, comment.ID, newComment.Content)
+// 			// log_str := fmt.Sprintf("[COMMENT REPLY]  %s commented on %s: %s", author, comment.ID, newComment.Content)
+// 			e.users[author].Karma++
+// 			log_str := fmt.Sprintf("[COMMENT REPLY]  %s commented on %s: %s", author, comment.ID, commentReply)
+// 			e.logUserAction(author, log_str)
+
+//				return
+//			}
+//			e.addChildComment(comment.Children, parentID, author, newComment)
+//		}
+//	}
+
+// adding child comment not behaving as exoected. instead create another method to add a reply.
+func (e *Engine) addChildComment(comments []*Comment, parentID string, author string, newComment *Comment) bool {
 	for _, comment := range comments {
 		if comment.ID == parentID {
 			commentReply := fmt.Sprintf("Reply %d to %s", len(comment.Children)+1, comment.ID)
+			fmt.Println(commentReply)
 			newComment.Content = commentReply
+			newComment.ID = fmt.Sprintf("Child Comment %d", len(comment.Children)+1)
 			comment.Children = append(comment.Children, newComment)
-			// log_str := fmt.Sprintf("[POST Comment]   %s commented on comment %s: %s", author, comment.ID, newComment.Content)
-			// log_str := fmt.Sprintf("[COMMENT REPLY]  %s commented on %s: %s", author, comment.ID, newComment.Content)
 			e.users[author].Karma++
-			log_str := fmt.Sprintf("[COMMENT REPLY]  %s commented on %s: %s", author, comment.ID, commentReply)
+			log_str := fmt.Sprintf("[COMMENT REPLY] %s commented on %s: %s", author, comment.ID, commentReply)
 			e.logUserAction(author, log_str)
-
-			return
+			return true
 		}
-		e.addChildComment(comment.Children, parentID, author, newComment)
+		if e.addChildComment(comment.Children, parentID, author, newComment) {
+			return true
+		}
 	}
+	return false
 }
-
-func (e *Engine) vote(postID, userID string, isUpvote bool) {
+func (e *Engine) vote(postID, userID string, isUpvote bool) error {
 	if post, exists := e.posts[postID]; exists {
-		if isUpvote {
-			post.Upvotes++
-			e.users[post.Author].Karma++
-		} else {
-			post.Downvotes++
-			e.users[post.Author].Karma--
+		if _, userExists := e.users[userID]; userExists {
+			if isUpvote {
+				post.Upvotes++
+				e.users[post.Author].Karma++
+			} else {
+				post.Downvotes++
+				e.users[post.Author].Karma--
+			}
+			voteType := "upvoted"
+			if !isUpvote {
+				voteType = "downvoted"
+			}
+			log_str := fmt.Sprintf("[VOTE] %s %s post %s", userID, voteType, postID)
+			e.logUserAction(userID, log_str)
+			return nil
 		}
-		voteType := "upvoted"
-		if !isUpvote {
-			voteType = "downvoted"
-		}
-		//fmt.Printf("[VOTE] %s %s post %s\n", userID, voteType, postID)
-		log_str := fmt.Sprintf("[VOTE]           %s %s post %s", userID, voteType, postID)
-		e.logUserAction(userID, log_str)
-
+		return fmt.Errorf("user %s does not exist", userID)
 	}
+	return fmt.Errorf("post %s does not exist", postID)
 }
 
-func (e *Engine) sendDirectMessage(from, to, content string) {
-	if fromUser, exists := e.users[from]; exists {
-		if toUser, exists := e.users[to]; exists {
+func (e *Engine) sendDirectMessage(from, to, content string) error {
+	if fromUser, fromExists := e.users[from]; fromExists {
+		if toUser, toExists := e.users[to]; toExists {
 			message := &DirectMessage{From: from, To: to, Content: content}
 			fromUser.SentMessages = append(fromUser.SentMessages, message)
 			toUser.ReceivedMessages = append(toUser.ReceivedMessages, message)
-			//fmt.Printf("[Direct Message] DM sent from %s to %s: %s\n", from, to, content)
 			log_str := fmt.Sprintf("[Direct Message] DM sent to %s: %s", to, content)
 			e.logUserAction(from, log_str)
+			return nil
 		}
+		return fmt.Errorf("recipient %s does not exist", to)
 	}
+	return fmt.Errorf("sender %s does not exist", from)
 }
+
+// func (e *Engine) vote(postID, userID string, isUpvote bool) {
+// 	if post, exists := e.posts[postID]; exists {
+// 		if isUpvote {
+// 			post.Upvotes++
+// 			e.users[post.Author].Karma++
+// 		} else {
+// 			post.Downvotes++
+// 			e.users[post.Author].Karma--
+// 		}
+// 		voteType := "upvoted"
+// 		if !isUpvote {
+// 			voteType = "downvoted"
+// 		}
+// 		//fmt.Printf("[VOTE] %s %s post %s\n", userID, voteType, postID)
+// 		log_str := fmt.Sprintf("[VOTE]           %s %s post %s", userID, voteType, postID)
+// 		e.logUserAction(userID, log_str)
+
+// 	}
+// }
+
+// func (e *Engine) sendDirectMessage(from, to, content string) {
+// 	if fromUser, exists := e.users[from]; exists {
+// 		if toUser, exists := e.users[to]; exists {
+// 			message := &DirectMessage{From: from, To: to, Content: content}
+// 			fromUser.SentMessages = append(fromUser.SentMessages, message)
+// 			toUser.ReceivedMessages = append(toUser.ReceivedMessages, message)
+// 			//fmt.Printf("[Direct Message] DM sent from %s to %s: %s\n", from, to, content)
+// 			log_str := fmt.Sprintf("[Direct Message] DM sent to %s: %s", to, content)
+// 			e.logUserAction(from, log_str)
+// 		}
+// 	}
+// }
 
 func (e *Engine) getFeed(username string) {
 	if user, exists := e.users[username]; exists {
