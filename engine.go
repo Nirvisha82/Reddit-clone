@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -14,21 +16,49 @@ type Engine struct {
 	subreddits  map[string]*Subreddit
 	posts       map[string]*Post
 	userActions map[string]*UserActions
+	// server      *http.Server
+	router *http.ServeMux
+}
+
+func (e *Engine) SetupRoutes() {
+	// mux := http.NewServeMux()
+	// mux.HandleFunc("/register", e.HandleRegisterUser)
+	// mux.HandleFunc("/subreddit", e.HandleCreateSubreddit)
+	// return mux
+	e.router.HandleFunc("/register", e.HandleRegisterUser)
+	e.router.HandleFunc("/subreddit", e.HandleCreateSubreddit)
+	// Add more routes here
 }
 
 func NewEngine() *Engine {
-	return &Engine{
+	e := &Engine{
 		users:       make(map[string]*User),
 		subreddits:  make(map[string]*Subreddit),
 		posts:       make(map[string]*Post),
 		userActions: make(map[string]*UserActions),
+		router:      http.NewServeMux(),
 	}
+	e.SetupRoutes()
+	return e
 }
+
+// func (e *Engine) StartServer(addr string) error {
+// 	e.server = &http.Server{
+// 		Addr:    addr,
+// 		Handler: e.SetupRoutes(),
+// 	}
+// 	return e.server.ListenAndServe()
+// }
 
 func (e *Engine) Receive(context actor.Context) {
 	switch msg := context.Message().(type) {
 	case *actor.Started:
 		fmt.Println("Engine started")
+		go func() {
+			if err := http.ListenAndServe(":8080", e.router); err != nil {
+				fmt.Printf("Server error: %v\n", err)
+			}
+		}()
 	case *RegisterUser:
 		e.registerUser(msg.Username)
 	case *CreateSubreddit:
@@ -57,14 +87,73 @@ func (e *Engine) Receive(context actor.Context) {
 	}
 }
 
-func (e *Engine) registerUser(username string) {
-	if _, exists := e.users[username]; !exists {
-		e.users[username] = &User{Username: username, Karma: 0}
-		//fmt.Printf("[REGISTER USER] User registered: %s\n", username)
-		e.logUserAction(username, "[REGISTER USER]  Registerd as new user")
-
+func (e *Engine) HandleRegisterUser1(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
+
+	var user struct {
+		Username string `json:"username"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	e.registerUser(user.Username)
+	w.WriteHeader(http.StatusOK)
 }
+
+func (e *Engine) HandleRegisterUser(w http.ResponseWriter, r *http.Request) {
+	var user struct {
+		Username string `json:"username"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err := e.registerUser(user.Username)
+	if err != nil {
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{"error": "User already exists"})
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "User registered successfully"})
+}
+
+func (e *Engine) HandleCreateSubreddit(w http.ResponseWriter, r *http.Request) {
+	var subreddit struct {
+		Name    string `json:"name"`
+		Creator string `json:"creator"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&subreddit); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	e.createSubreddit(subreddit.Name, subreddit.Creator)
+	w.WriteHeader(http.StatusOK)
+}
+func (e *Engine) registerUser(username string) error {
+	if _, exists := e.users[username]; exists {
+		return fmt.Errorf("user already exists")
+	}
+	e.users[username] = &User{Username: username, Karma: 0}
+	e.logUserAction(username, "[REGISTER USER] Registered as new user")
+	return nil
+}
+
+// func (e *Engine) registerUser(username string) {
+// 	if _, exists := e.users[username]; !exists {
+// 		e.users[username] = &User{Username: username, Karma: 0}
+// 		e.logUserAction(username, "[REGISTER USER]  Registerd as new user")
+// 	} else {
+// 		fmt.Printf("The user : %s already exists!", username)
+// 	}
+// }
 
 func (e *Engine) createSubreddit(name, creator string) {
 	if _, exists := e.subreddits[name]; !exists {
