@@ -1,16 +1,18 @@
-# Reddit-like Engine and Simulator in Go
+# Reddit-like Engine with REST Architecture in Go
 
-This project implements a simplified Reddit-like engine and simulator using Go and the _Proto Actor_ framework. The system simulates user activities, subreddit interactions, and content creation in a concurrent and distributed manner. The simulator uses a Zipf distribution to model the popularity of subreddits, which helps create a more realistic simulation of user behavior and content distribution.
+This project implements a simplified Reddit-like engine and REST APIs using Go and the _Proto Actor_ framework. The API routes 
+## Demo
+The high-level overview and demo can be found on this link : [Demo Video](https://youtu.be/-IOdgxn6tCQ)
 
 ## Overview
 
-The project consists of five main components:
+The project consists of six main components:
 
 1. `main.go`:The entry point of the system.
 2. `messages.go`: Defines the message structures used for communication between actors.
 3. `models.go`: Contains the data models for users, subreddits, posts, and comments.
 4. `engine.go`: Implements the core logic of the Reddit-like system.
-5. `simulator.go`: Simulates user actions and interactions with the engine.
+5. `client.go`: Contains the REST API requestS handler functions.
 
 ## Implemented Features
 1. Register User.
@@ -26,52 +28,138 @@ The project consists of five main components:
     4. -1 Karma for each downvote on the posts made.
 8. Send direct message to an user.
 9. Reply to direct message sent by another user.
-10. Connection/Disconnection of users, basically an user will perform an action(Post, create sub, comment, leave or join sub) only when its connected to the simulator even though simulator might choose a user to do some task.
-11. Get feed for joined SubReddits.
+10. Get feed for joined SubReddits.
 
-## Algorithm
+Below is an expanded README section containing instructions on using the REST API calls to interact with the engine. Each route is listed with the JSON it expects and the typical responses.
 
-The simulation follows these main steps:
-
-1. Initialize the actor system with an Engine actor and a Simulator actor.
-2. The Simulator registers initial users and creates initial subreddits.
-3. The Simulator then randomly generates actions (e.g., creating posts, commenting, voting) and sends them to the Engine.
-4. The Engine processes these actions, updating the system state accordingly.
-5. The simulation runs for a specified duration or number of actions.
-6. Finally, the system prints out statistics and user actions.
-
-## Usage
-
-To run the simulation, use the following command and change the values as needed:
-
+## API Endpoints
+### **Initialize Server**
+To begin the server, use the following command. By default, the server runs on `http://localhost:8080`. This can be modified by changing the server in _Recieve_ method in `engine.go`.
 ```bash
-go run . -users 10 -subreddits 3 -actions 100 -time 3
+    go run .
 ```
 
-Available flags:
-- `-users`: Maximum number of users (default: 30)
-- `-subreddits`: Maximum number of subreddits (default: 6)
-- `-actions`: Number of simulation actions (default: 200)
-- `-time`: Simulation time in seconds (default: 5)
+### **Register User**
 
-The simulation will run for the specified time or number of actions, generating a variety of user activities and interactions within the simulated Reddit-like system.
+- **Route**: `/register`
+- **Method**: `POST`
+- **Request JSON**:
+  ```json
+  {
+    "username": "exampleUser"
+  }
+  ```
 
-#### Note: To see all the implemented features, run the simulation for  default (or lower) values using `go run .`
+### **Create Subreddit**
 
+- **Route**: `/createsub`
+- **Method**: `POST`
+- **Request JSON**:
+  ```json
+  {
+    "creator": "exampleUser",
+    "name": "exampleSubreddit"
+  }
 
-## Largest Network
+### **Join Subreddit**
 
-```bash
-Maximum Users    : 100K
-Total Actions    : 250K
-Total SubReddits : 600
-Time  (mm:ss)    : 2:40
+- **Route**: `/joinsub`
+- **Method**: `POST`
+- **Request JSON**:
+  ```json
+  {
+    "subName": "exampleSubreddit",
+    "user": "exampleUser"
+  }
+  ```
 
-Machine          : 12-Core M3 Pro 
-Memory           : 18 GB
-```
-`Note:` More users can be simulated, however the simulation time increases with Actions, SubReddits and Users.
+### **Leave Subreddit**
 
+- **Route**: `/leavesub`
+- **Method**: `POST`
+- **Request JSON**:
+  ```json
+  {
+    "subName": "exampleSubreddit",
+    "user": "exampleUser"
+  }
+  ```
+
+### **Create Post**
+
+- **Route**: `/createpost`
+- **Method**: `POST`
+- **Request JSON**:
+  ```json
+  {
+    "subredditName": "exampleSubreddit",
+    "author": "exampleUser",
+    "title": "Example Title",
+    "content": "Example content of the post."
+  }
+  ```
+### **Create Comment**
+
+- **Route**: `/createcomment`
+- **Method**: `POST`
+- **Request JSON**:
+  ```json
+  {
+    "postID": "Post [n]",
+    "parentID": "Post [n]", //or 'Comment [n]' in case of heirarchical comments
+    "author": "exampleUser",
+    "content": "This is a comment."
+  }
+  ```
+
+### **Vote on Post**
+
+- **Route**: `/vote`
+- **Method**: `POST`
+- **Request JSON**:
+  ```json
+  {
+     "userID": "exampleUser",
+     "postID": "Post [n]",
+     "isUpvote": true // false for downvote
+   }
+   ```
+
+### **Get User Feed**
+
+- **Route**: `/getfeed`
+- **Method**: `Get`
+- **Request JSON**:
+   ```json
+   {
+     "username": "[username]"
+   }
+   ```
+- **Response**
+   - If successful, returns a list of posts from subscribed subreddits.
+   - On error or if no posts are available, an appropriate message is returned.
+
+### **Send Direct Message**
+
+- **Route:** `/sendmessage`
+- **Method:** `POST`
+- **Request JSON:** 
+   ```json
+   {
+     “from”: “[sender]”,
+     “to”: “[recipient]”,
+     “content”: “[Content]”
+   }
+   ```
+
+### **Summarize Session** 
+- **Route:** `/summarize`
+- **Method:** `GET `
+- **Response**
+   - User-wise Actions.
+   - Subreddit-wise Members, Posts & Comments and their stats.
+   - Simulation stats like users, actions, karma, total comments, votes etc.
+ 
 ## Engine Methods
 
 The Engine actor handles the core functionality of the Reddit-like system. Here's an overview of its main methods:
@@ -108,55 +196,6 @@ Generates a feed of posts from subreddits the user is subscribed to.
 
 `getSimulationStats()` :
 Prints out statistics about users, subreddits, and posts.
-
-## Simulator Methods
-
-The Simulator actor generates random actions to simulate user behavior. Here are its main methods:
-
-`Receive(context actor.Context)` :
-Handles incoming messages and initiates the simulation.
-
-`runSimulation(context actor.Context)` :
-Runs the main simulation loop, generating random actions.
-
-`registerInitialUsers(context actor.Context)` :
-Creates a set of initial users at the start of the simulation.
-
-`createInitialSubreddits(context actor.Context)` :
-Creates a set of initial subreddits at the start of the simulation.
-
-`simulateAction(context actor.Context)` :
-Randomly selects and executes a simulated user action.
-
-`simulateConnection()` :
-Simulates users connecting to or disconnecting from the system.
-
-`simulateRegisterUser(context actor.Context)` :
-Simulates a new user registration.
-
-`simulateCreateSubreddit(context actor.Context)` :
-Simulates the creation of a new subreddit.
-
-`simulateJoinSubreddit(context actor.Context)` :
-Simulates users joining subreddits.
-
-`simulateLeaveSubreddit(context actor.Context)` :
-Simulates a user leaving a subreddit.
-
-`simulateCreatePost(context actor.Context)` :
-Simulates a user creating a new post.
-
-`simulateCreateComment(context actor.Context)` :
-Simulates a user commenting on a post or replying to a comment.
-
-`simulateVote(context actor.Context)` :
-Simulates a user voting on a post.
-
-`simulateSendDirectMessage(context actor.Context)` :
-Simulates a user sending a direct message to another user.
-
-`simulateGetFeed(context actor.Context)` :
-Simulates a user requesting their personalized feed.
 
 
 

@@ -47,7 +47,7 @@ func NewEngine() *Engine {
 func (e *Engine) Receive(context actor.Context) {
 	switch msg := context.Message().(type) {
 	case *actor.Started:
-		fmt.Println("Engine started")
+		fmt.Println("Server started")
 		go func() {
 			// if err := http.ListenAndServe("0.0.0.0:8080", e.router); err != nil {
 			if err := http.ListenAndServe("localhost:8080", e.router); err != nil {
