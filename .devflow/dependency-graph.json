@@ -1,0 +1,74 @@
+{
+  "nodes": [
+    {
+      "file": "README.md",
+      "language": "markdown",
+      "dependencies": [],
+      "exports": [],
+      "imports": []
+    },
+    {
+      "file": "engine.go",
+      "language": "go",
+      "dependencies": [],
+      "exports": [],
+      "imports": [
+        "fmt",
+        "sort",
+        "strings",
+        "time",
+        "github.com/asynkron/protoactor-go/actor"
+      ]
+    },
+    {
+      "file": "go.mod",
+      "language": "",
+      "dependencies": [],
+      "exports": [],
+      "imports": []
+    },
+    {
+      "file": "main.go",
+      "language": "go",
+      "dependencies": [],
+      "exports": [],
+      "imports": [
+        "flag",
+        "fmt",
+        "math/rand",
+        "time",
+        "github.com/asynkron/protoactor-go/actor"
+      ]
+    },
+    {
+      "file": "messages.go",
+      "language": "go",
+      "dependencies": [],
+      "exports": [],
+      "imports": [
+        "time"
+      ]
+    },
+    {
+      "file": "models.go",
+      "language": "go",
+      "dependencies": [],
+      "exports": [],
+      "imports": []
+    },
+    {
+      "file": "simulator.go",
+      "language": "go",
+      "dependencies": [],
+      "exports": [],
+      "imports": [
+        "fmt",
+        "math/rand",
+        "time",
+        "github.com/asynkron/protoactor-go/actor"
+      ]
+    }
+  ],
+  "generated_at": "2025-10-29T02:01:00.416419-04:00",
+  "repo_url": ""
+}
