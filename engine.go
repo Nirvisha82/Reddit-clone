@@ -48,6 +48,12 @@ func (e *Engine) Receive(context actor.Context) {
 		e.sendDirectMessage(msg.From, msg.To, msg.Content)
 	case *GetFeed:
 		e.getFeed(msg.Username)
+	case *BookmarkPost:
+		e.bookmarkPost(msg.PostID, msg.Username)
+	case *UnbookmarkPost:
+		e.unbookmarkPost(msg.PostID, msg.Username)
+	case *GetBookmarkedPosts:
+		e.getBookmarkedPosts(msg.Username)
 	case *GetSimulationStats:
 		e.getSimulationStats()
 	case *PrintUserActions:
@@ -206,6 +212,49 @@ func (e *Engine) getFeed(username string) {
 			//fmt.Printf("%s (in %s)\n", post.Title, post.SubredditName)
 			log_str := fmt.Sprintf("                 %s (in %s)", post.Title, post.SubredditName)
 			e.logUserAction(username, log_str)
+		}
+	}
+}
+
+func (e *Engine) bookmarkPost(postID, username string) {
+	if post, postExists := e.posts[postID]; postExists {
+		if user, userExists := e.users[username]; userExists {
+			if !contains(user.BookmarkedPosts, postID) {
+				user.BookmarkedPosts = append(user.BookmarkedPosts, postID)
+				log_str := fmt.Sprintf("[BOOKMARK]       %s bookmarked post %s by %s: %s", username, postID, post.Author, post.Title)
+				e.logUserAction(username, log_str)
+			}
+		}
+	}
+}
+
+func (e *Engine) unbookmarkPost(postID, username string) {
+	if post, postExists := e.posts[postID]; postExists {
+		if user, userExists := e.users[username]; userExists {
+			if contains(user.BookmarkedPosts, postID) {
+				user.BookmarkedPosts = remove(user.BookmarkedPosts, postID)
+				log_str := fmt.Sprintf("[UNBOOKMARK]     %s unbookmarked post %s by %s: %s", username, postID, post.Author, post.Title)
+				e.logUserAction(username, log_str)
+			}
+		}
+	}
+}
+
+func (e *Engine) getBookmarkedPosts(username string) {
+	if user, exists := e.users[username]; exists {
+		log_str := fmt.Sprintf("[BOOKMARKS]      Bookmarked posts for %s ----- ", username)
+		e.logUserAction(username, log_str)
+
+		if len(user.BookmarkedPosts) == 0 {
+			log_str := fmt.Sprintf("                 No bookmarked posts yet")
+			e.logUserAction(username, log_str)
+		} else {
+			for _, postID := range user.BookmarkedPosts {
+				if post, exists := e.posts[postID]; exists {
+					log_str := fmt.Sprintf("                 %s (in %s) by %s", post.Title, post.SubredditName, post.Author)
+					e.logUserAction(username, log_str)
+				}
+			}
 		}
 	}
 }
