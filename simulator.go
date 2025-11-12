@@ -82,7 +82,7 @@ func (s *Simulator) createInitialSubreddits(context actor.Context) {
 }
 
 func (s *Simulator) simulateAction(context actor.Context) {
-	action := rand.Intn(8)
+	action := rand.Intn(10)
 	switch action {
 	case 0:
 		s.simulateJoinSubreddit(context)
@@ -100,6 +100,10 @@ func (s *Simulator) simulateAction(context actor.Context) {
 		s.simulateGetFeed(context)
 	case 7:
 		s.simulateConnection()
+	case 8:
+		s.simulateBookmarkPost(context)
+	case 9:
+		s.simulateUnbookmarkPost(context)
 	}
 }
 
@@ -266,4 +270,22 @@ func (s *Simulator) printSimulationStats(context actor.Context) {
 
 func (s *Simulator) printUserActions(context actor.Context) {
 	context.Send(s.enginePID, &PrintUserActions{})
+}
+
+func (s *Simulator) simulateBookmarkPost(context actor.Context) {
+	if len(s.posts) > 0 {
+		context.Send(s.enginePID, &BookmarkPost{
+			PostID:   s.randomPost(),
+			Username: s.randomUser(),
+		})
+	}
+}
+
+func (s *Simulator) simulateUnbookmarkPost(context actor.Context) {
+	if len(s.posts) > 0 {
+		context.Send(s.enginePID, &UnbookmarkPost{
+			PostID:   s.randomPost(),
+			Username: s.randomUser(),
+		})
+	}
 }

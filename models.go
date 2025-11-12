@@ -4,6 +4,7 @@ type User struct {
 	Username             string
 	Karma                int
 	SubscribedSubreddits []string
+	BookmarkedPosts      []string
 	SentMessages         []*DirectMessage
 	ReceivedMessages     []*DirectMessage
 }

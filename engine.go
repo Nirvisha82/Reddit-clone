@@ -54,6 +54,10 @@ func (e *Engine) Receive(context actor.Context) {
 		e.printAllUserActions()
 	case *PrintSubredditPostsAndComments:
 		e.printSubredditPostsAndComments()
+	case *BookmarkPost:
+		e.bookmarkPost(msg.PostID, msg.Username)
+	case *UnbookmarkPost:
+		e.unbookmarkPost(msg.PostID, msg.Username)
 	}
 }
 
@@ -311,6 +315,30 @@ func (e *Engine) printComments(comments []*Comment, depth int) {
 		fmt.Printf("%s- %s: %s\n", indent, comment.Author, comment.Content)
 		if len(comment.Children) > 0 {
 			e.printComments(comment.Children, depth+1)
+		}
+	}
+}
+
+func (e *Engine) bookmarkPost(postID, username string) {
+	if post, postExists := e.posts[postID]; postExists {
+		if user, userExists := e.users[username]; userExists {
+			if !contains(user.BookmarkedPosts, postID) {
+				user.BookmarkedPosts = append(user.BookmarkedPosts, postID)
+				log_str := fmt.Sprintf("[BOOKMARK]       %s bookmarked post %s (%s)", username, postID, post.Title)
+				e.logUserAction(username, log_str)
+			}
+		}
+	}
+}
+
+func (e *Engine) unbookmarkPost(postID, username string) {
+	if post, postExists := e.posts[postID]; postExists {
+		if user, userExists := e.users[username]; userExists {
+			if contains(user.BookmarkedPosts, postID) {
+				user.BookmarkedPosts = remove(user.BookmarkedPosts, postID)
+				log_str := fmt.Sprintf("[UNBOOKMARK]     %s unbookmarked post %s (%s)", username, postID, post.Title)
+				e.logUserAction(username, log_str)
+			}
 		}
 	}
 }
