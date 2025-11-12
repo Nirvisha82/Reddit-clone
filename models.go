@@ -30,6 +30,8 @@ type Comment struct {
 	ParentID string
 	Author   string
 	Content  string
+	Upvotes  int
+	Downvotes int
 	Children []*Comment
 }
 

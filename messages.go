@@ -49,6 +49,13 @@ type Vote struct {
 	IsUpvote bool
 }
 
+type VoteComment struct {
+	PostID    string
+	CommentID string
+	UserID    string
+	IsUpvote  bool
+}
+
 type SendDirectMessage struct {
 	From    string
 	To      string

@@ -44,6 +44,8 @@ func (e *Engine) Receive(context actor.Context) {
 		e.createComment(msg.PostID, msg.ParentID, msg.CommentID, msg.Author, msg.Content)
 	case *Vote:
 		e.vote(msg.PostID, msg.UserID, msg.IsUpvote)
+	case *VoteComment:
+		e.voteComment(msg.PostID, msg.CommentID, msg.UserID, msg.IsUpvote)
 	case *SendDirectMessage:
 		e.sendDirectMessage(msg.From, msg.To, msg.Content)
 	case *GetFeed:
@@ -176,6 +178,39 @@ func (e *Engine) vote(postID, userID string, isUpvote bool) {
 	}
 }
 
+func (e *Engine) voteComment(postID, commentID, userID string, isUpvote bool) {
+	if post, exists := e.posts[postID]; exists {
+		comment := e.findCommentByID(post.Comments, commentID)
+		if comment != nil {
+			if isUpvote {
+				comment.Upvotes++
+				e.users[comment.Author].Karma++
+			} else {
+				comment.Downvotes++
+				e.users[comment.Author].Karma--
+			}
+			voteType := "upvoted"
+			if !isUpvote {
+				voteType = "downvoted"
+			}
+			log_str := fmt.Sprintf("[VOTE COMMENT]   %s %s comment %s on post %s", userID, voteType, commentID, postID)
+			e.logUserAction(userID, log_str)
+		}
+	}
+}
+
+func (e *Engine) findCommentByID(comments []*Comment, commentID string) *Comment {
+	for _, comment := range comments {
+		if comment.ID == commentID {
+			return comment
+		}
+		if found := e.findCommentByID(comment.Children, commentID); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
 func (e *Engine) sendDirectMessage(from, to, content string) {
 	if fromUser, exists := e.users[from]; exists {
 		if toUser, exists := e.users[to]; exists {
@@ -289,7 +324,7 @@ func (e *Engine) printSubredditPostsAndComments() {
 				fmt.Printf(" Upvotes: %d | Downvotes: %d\n", post.Upvotes, post.Downvotes)
 				if len(post.Comments) > 0 {
 					fmt.Println(" Comments:")
-					e.printComments(post.Comments, 1)
+					e.printComments(post.Comments, 1, postID)
 
 				} else {
 					fmt.Println(" No comments yet.")
@@ -305,12 +340,12 @@ func (e *Engine) printSubredditPostsAndComments() {
 	}
 }
 
-func (e *Engine) printComments(comments []*Comment, depth int) {
+func (e *Engine) printComments(comments []*Comment, depth int, postID string) {
 	for _, comment := range comments {
 		indent := strings.Repeat("  ", depth)
-		fmt.Printf("%s- %s: %s\n", indent, comment.Author, comment.Content)
+		fmt.Printf("%s- [%s] %s: %s (↑%d ↓%d)\n", indent, comment.ID, comment.Author, comment.Content, comment.Upvotes, comment.Downvotes)
 		if len(comment.Children) > 0 {
-			e.printComments(comment.Children, depth+1)
+			e.printComments(comment.Children, depth+1, postID)
 		}
 	}
 }
