@@ -46,6 +46,10 @@ func (e *Engine) Receive(context actor.Context) {
 		e.vote(msg.PostID, msg.UserID, msg.IsUpvote)
 	case *SendDirectMessage:
 		e.sendDirectMessage(msg.From, msg.To, msg.Content)
+	case *BookmarkPost:
+		e.bookmarkPost(msg.PostID, msg.Username)
+	case *UnbookmarkPost:
+		e.unbookmarkPost(msg.PostID, msg.Username)
 	case *GetFeed:
 		e.getFeed(msg.Username)
 	case *GetSimulationStats:
@@ -185,6 +189,30 @@ func (e *Engine) sendDirectMessage(from, to, content string) {
 			//fmt.Printf("[Direct Message] DM sent from %s to %s: %s\n", from, to, content)
 			log_str := fmt.Sprintf("[Direct Message] DM sent to %s: %s", to, content)
 			e.logUserAction(from, log_str)
+		}
+	}
+}
+
+func (e *Engine) bookmarkPost(postID, username string) {
+	if post, postExists := e.posts[postID]; postExists {
+		if user, userExists := e.users[username]; userExists {
+			if !contains(user.BookmarkedPosts, postID) {
+				user.BookmarkedPosts = append(user.BookmarkedPosts, postID)
+				log_str := fmt.Sprintf("[BOOKMARK]       %s bookmarked post %s by %s: %s", username, postID, post.Author, post.Title)
+				e.logUserAction(username, log_str)
+			}
+		}
+	}
+}
+
+func (e *Engine) unbookmarkPost(postID, username string) {
+	if post, postExists := e.posts[postID]; postExists {
+		if user, userExists := e.users[username]; userExists {
+			if contains(user.BookmarkedPosts, postID) {
+				user.BookmarkedPosts = remove(user.BookmarkedPosts, postID)
+				log_str := fmt.Sprintf("[UNBOOKMARK]     %s unbookmarked post %s by %s: %s", username, postID, post.Author, post.Title)
+				e.logUserAction(username, log_str)
+			}
 		}
 	}
 }
