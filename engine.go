@@ -50,6 +50,10 @@ func (e *Engine) Receive(context actor.Context) {
 		e.getFeed(msg.Username)
 	case *GetSimulationStats:
 		e.getSimulationStats()
+	case *BookmarkPost:
+		e.bookmarkPost(msg.PostID, msg.Username)
+	case *UnbookmarkPost:
+		e.unbookmarkPost(msg.PostID, msg.Username)
 	case *PrintUserActions:
 		e.printAllUserActions()
 	case *PrintSubredditPostsAndComments:
@@ -206,6 +210,30 @@ func (e *Engine) getFeed(username string) {
 			//fmt.Printf("%s (in %s)\n", post.Title, post.SubredditName)
 			log_str := fmt.Sprintf("                 %s (in %s)", post.Title, post.SubredditName)
 			e.logUserAction(username, log_str)
+		}
+	}
+}
+
+func (e *Engine) bookmarkPost(postID, username string) {
+	if post, postExists := e.posts[postID]; postExists {
+		if user, userExists := e.users[username]; userExists {
+			if !contains(user.BookmarkedPosts, postID) {
+				user.BookmarkedPosts = append(user.BookmarkedPosts, postID)
+				log_str := fmt.Sprintf("[BOOKMARK]       %s bookmarked post %s by %s", username, postID, post.Author)
+				e.logUserAction(username, log_str)
+			}
+		}
+	}
+}
+
+func (e *Engine) unbookmarkPost(postID, username string) {
+	if _, postExists := e.posts[postID]; postExists {
+		if user, userExists := e.users[username]; userExists {
+			if contains(user.BookmarkedPosts, postID) {
+				user.BookmarkedPosts = remove(user.BookmarkedPosts, postID)
+				log_str := fmt.Sprintf("[UNBOOKMARK]     %s unbookmarked post %s", username, postID)
+				e.logUserAction(username, log_str)
+			}
 		}
 	}
 }

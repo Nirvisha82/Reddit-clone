@@ -59,6 +59,16 @@ type GetFeed struct {
 	Username string
 }
 
+type BookmarkPost struct {
+	PostID   string
+	Username string
+}
+
+type UnbookmarkPost struct {
+	PostID   string
+	Username string
+}
+
 type UserAction struct {
 	Action    string
 	Timestamp time.Time
