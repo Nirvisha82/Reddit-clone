@@ -44,6 +44,10 @@ func (e *Engine) Receive(context actor.Context) {
 		e.createComment(msg.PostID, msg.ParentID, msg.CommentID, msg.Author, msg.Content)
 	case *Vote:
 		e.vote(msg.PostID, msg.UserID, msg.IsUpvote)
+	case *BookmarkPost:
+		e.bookmarkPost(msg.PostID, msg.Username)
+	case *UnbookmarkPost:
+		e.unbookmarkPost(msg.PostID, msg.Username)
 	case *SendDirectMessage:
 		e.sendDirectMessage(msg.From, msg.To, msg.Content)
 	case *GetFeed:
@@ -59,7 +63,7 @@ func (e *Engine) Receive(context actor.Context) {
 
 func (e *Engine) registerUser(username string) {
 	if _, exists := e.users[username]; !exists {
-		e.users[username] = &User{Username: username, Karma: 0}
+		e.users[username] = &User{Username: username, Karma: 0, BookmarkedPosts: []string{}}
 		//fmt.Printf("[REGISTER USER] User registered: %s\n", username)
 		e.logUserAction(username, "[REGISTER USER]  Registerd as new user")
 
@@ -173,6 +177,30 @@ func (e *Engine) vote(postID, userID string, isUpvote bool) {
 		log_str := fmt.Sprintf("[VOTE]           %s %s post %s", userID, voteType, postID)
 		e.logUserAction(userID, log_str)
 
+	}
+}
+
+func (e *Engine) bookmarkPost(postID, username string) {
+	if post, exists := e.posts[postID]; exists {
+		if user, userExists := e.users[username]; userExists {
+			if !contains(user.BookmarkedPosts, postID) {
+				user.BookmarkedPosts = append(user.BookmarkedPosts, postID)
+				log_str := fmt.Sprintf("[BOOKMARK]       %s bookmarked post %s by %s", username, postID, post.Author)
+				e.logUserAction(username, log_str)
+			}
+		}
+	}
+}
+
+func (e *Engine) unbookmarkPost(postID, username string) {
+	if post, exists := e.posts[postID]; exists {
+		if user, userExists := e.users[username]; userExists {
+			if contains(user.BookmarkedPosts, postID) {
+				user.BookmarkedPosts = remove(user.BookmarkedPosts, postID)
+				log_str := fmt.Sprintf("[UNBOOKMARK]     %s unbookmarked post %s by %s", username, postID, post.Author)
+				e.logUserAction(username, log_str)
+			}
+		}
 	}
 }
 

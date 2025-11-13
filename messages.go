@@ -49,6 +49,16 @@ type Vote struct {
 	IsUpvote bool
 }
 
+type BookmarkPost struct {
+	PostID   string
+	Username string
+}
+
+type UnbookmarkPost struct {
+	PostID   string
+	Username string
+}
+
 type SendDirectMessage struct {
 	From    string
 	To      string

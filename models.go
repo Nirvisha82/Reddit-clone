@@ -3,6 +3,7 @@ package main
 type User struct {
 	Username             string
 	Karma                int
+	BookmarkedPosts      []string
 	SubscribedSubreddits []string
 	SentMessages         []*DirectMessage
 	ReceivedMessages     []*DirectMessage
