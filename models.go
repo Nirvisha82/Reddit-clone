@@ -6,6 +6,7 @@ type User struct {
 	SubscribedSubreddits []string
 	SentMessages         []*DirectMessage
 	ReceivedMessages     []*DirectMessage
+	BookmarkedPosts      []string
 }
 
 type Subreddit struct {

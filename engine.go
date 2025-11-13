@@ -54,6 +54,10 @@ func (e *Engine) Receive(context actor.Context) {
 		e.printAllUserActions()
 	case *PrintSubredditPostsAndComments:
 		e.printSubredditPostsAndComments()
+	case *BookmarkPost:
+		e.bookmarkPost(msg.PostID, msg.Username)
+	case *UnbookmarkPost:
+		e.unbookmarkPost(msg.PostID, msg.Username)
 	}
 }
 
@@ -173,6 +177,30 @@ func (e *Engine) vote(postID, userID string, isUpvote bool) {
 		log_str := fmt.Sprintf("[VOTE]           %s %s post %s", userID, voteType, postID)
 		e.logUserAction(userID, log_str)
 
+	}
+}
+
+func (e *Engine) bookmarkPost(postID, username string) {
+	if post, exists := e.posts[postID]; exists {
+		if user, userExists := e.users[username]; userExists {
+			if !contains(user.BookmarkedPosts, postID) {
+				user.BookmarkedPosts = append(user.BookmarkedPosts, postID)
+				log_str := fmt.Sprintf("[BOOKMARK]       %s bookmarked post %s by %s", username, postID, post.Author)
+				e.logUserAction(username, log_str)
+			}
+		}
+	}
+}
+
+func (e *Engine) unbookmarkPost(postID, username string) {
+	if _, exists := e.posts[postID]; exists {
+		if user, userExists := e.users[username]; userExists {
+			if contains(user.BookmarkedPosts, postID) {
+				user.BookmarkedPosts = remove(user.BookmarkedPosts, postID)
+				log_str := fmt.Sprintf("[UNBOOKMARK]     %s unbookmarked post %s", username, postID)
+				e.logUserAction(username, log_str)
+			}
+		}
 	}
 }
 
