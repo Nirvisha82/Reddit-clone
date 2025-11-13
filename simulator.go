@@ -99,6 +99,10 @@ func (s *Simulator) simulateAction(context actor.Context) {
 	case 6:
 		s.simulateGetFeed(context)
 	case 7:
+		s.simulateBookmarkPost(context)
+	case 8:
+		s.simulateUnbookmarkPost(context)
+	case 9:
 		s.simulateConnection()
 	}
 }
@@ -244,6 +248,24 @@ func (s *Simulator) simulateSendDirectMessage(context actor.Context) {
 
 func (s *Simulator) simulateGetFeed(context actor.Context) {
 	context.Send(s.enginePID, &GetFeed{Username: s.randomUser()})
+}
+
+func (s *Simulator) simulateBookmarkPost(context actor.Context) {
+	if len(s.posts) > 0 {
+		context.Send(s.enginePID, &BookmarkPost{
+			PostID:   s.randomPost(),
+			Username: s.randomUser(),
+		})
+	}
+}
+
+func (s *Simulator) simulateUnbookmarkPost(context actor.Context) {
+	if len(s.posts) > 0 {
+		context.Send(s.enginePID, &UnbookmarkPost{
+			PostID:   s.randomPost(),
+			Username: s.randomUser(),
+		})
+	}
 }
 
 func (s *Simulator) randomUser() string {

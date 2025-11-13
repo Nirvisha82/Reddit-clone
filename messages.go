@@ -80,3 +80,13 @@ type PrintSubredditPostsAndComments struct{}
 
 type StartSimulation struct{}
 type SimulationCompleted struct{}
+
+type BookmarkPost struct {
+	PostID   string
+	Username string
+}
+
+type UnbookmarkPost struct {
+	PostID   string
+	Username string
+}
