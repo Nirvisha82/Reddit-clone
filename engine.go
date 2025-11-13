@@ -44,6 +44,10 @@ func (e *Engine) Receive(context actor.Context) {
 		e.createComment(msg.PostID, msg.ParentID, msg.CommentID, msg.Author, msg.Content)
 	case *Vote:
 		e.vote(msg.PostID, msg.UserID, msg.IsUpvote)
+	case *BookmarkPost:
+		e.bookmarkPost(msg.PostID, msg.Username)
+	case *UnbookmarkPost:
+		e.unbookmarkPost(msg.PostID, msg.Username)
 	case *SendDirectMessage:
 		e.sendDirectMessage(msg.From, msg.To, msg.Content)
 	case *GetFeed:
@@ -176,6 +180,30 @@ func (e *Engine) vote(postID, userID string, isUpvote bool) {
 	}
 }
 
+func (e *Engine) bookmarkPost(postID, username string) {
+	if post, postExists := e.posts[postID]; postExists {
+		if user, userExists := e.users[username]; userExists {
+			if !contains(user.BookmarkedPosts, postID) {
+				user.BookmarkedPosts = append(user.BookmarkedPosts, postID)
+				log_str := fmt.Sprintf("[BOOKMARK]       %s bookmarked post %s by %s in %s", username, postID, post.Author, post.SubredditName)
+				e.logUserAction(username, log_str)
+			}
+		}
+	}
+}
+
+func (e *Engine) unbookmarkPost(postID, username string) {
+	if post, postExists := e.posts[postID]; postExists {
+		if user, userExists := e.users[username]; userExists {
+			if contains(user.BookmarkedPosts, postID) {
+				user.BookmarkedPosts = remove(user.BookmarkedPosts, postID)
+				log_str := fmt.Sprintf("[UNBOOKMARK]     %s unbookmarked post %s by %s in %s", username, postID, post.Author, post.SubredditName)
+				e.logUserAction(username, log_str)
+			}
+		}
+	}
+}
+
 func (e *Engine) sendDirectMessage(from, to, content string) {
 	if fromUser, exists := e.users[from]; exists {
 		if toUser, exists := e.users[to]; exists {
@@ -224,6 +252,16 @@ func (e *Engine) getSimulationStats() {
 	sort.Strings(users)
 	for _, username := range users {
 		fmt.Printf("%s: %d karma\n", username, e.users[username].Karma)
+		if len(e.users[username].BookmarkedPosts) > 0 {
+			fmt.Printf("  Bookmarked posts: ")
+			for i, postID := range e.users[username].BookmarkedPosts {
+				if i > 0 {
+					fmt.Printf(", ")
+				}
+				fmt.Printf("%s", postID)
+			}
+			fmt.Printf("\n")
+		}
 	}
 
 	fmt.Println("\nPost Statistics:")
