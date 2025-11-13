@@ -179,7 +179,7 @@ func (e *Engine) vote(postID, userID string, isUpvote bool) {
 func (e *Engine) sendDirectMessage(from, to, content string) {
 	if fromUser, exists := e.users[from]; exists {
 		if toUser, exists := e.users[to]; exists {
-			message := &DirectMessage{From: from, To: to, Content: content}
+			message := &DirectMessage{From: from, To: to, Content: content, Timestamp: time.Now()}
 			fromUser.SentMessages = append(fromUser.SentMessages, message)
 			toUser.ReceivedMessages = append(toUser.ReceivedMessages, message)
 			//fmt.Printf("[Direct Message] DM sent from %s to %s: %s\n", from, to, content)

@@ -1,5 +1,7 @@
 package main
 
+import "time"
+
 type User struct {
 	Username             string
 	Karma                int
@@ -37,4 +39,5 @@ type DirectMessage struct {
 	From    string
 	To      string
 	Content string
+	Timestamp time.Time
 }
