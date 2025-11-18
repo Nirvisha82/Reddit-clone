@@ -55,6 +55,12 @@ type SendDirectMessage struct {
 	Content string
 }
 
+type SharePostViaDirectMessage struct {
+	From   string
+	To     string
+	PostID string
+}
+
 type GetFeed struct {
 	Username string
 }

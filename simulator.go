@@ -82,7 +82,7 @@ func (s *Simulator) createInitialSubreddits(context actor.Context) {
 }
 
 func (s *Simulator) simulateAction(context actor.Context) {
-	action := rand.Intn(8)
+	action := rand.Intn(9)
 	switch action {
 	case 0:
 		s.simulateJoinSubreddit(context)
@@ -100,6 +100,8 @@ func (s *Simulator) simulateAction(context actor.Context) {
 		s.simulateGetFeed(context)
 	case 7:
 		s.simulateConnection()
+	case 8:
+		s.simulateSharePostViaDirectMessage(context)
 	}
 }
 
@@ -240,6 +242,21 @@ func (s *Simulator) simulateSendDirectMessage(context actor.Context) {
 		To:      from,
 		Content: fmt.Sprintf("This is a reply message from %s to %s", to, from),
 	})
+}
+
+func (s *Simulator) simulateSharePostViaDirectMessage(context actor.Context) {
+	if len(s.posts) > 0 {
+		from := s.randomUser()
+		to := s.randomUser()
+		for to == from {
+			to = s.randomUser()
+		}
+		context.Send(s.enginePID, &SharePostViaDirectMessage{
+			From:   from,
+			To:     to,
+			PostID: s.randomPost(),
+		})
+	}
 }
 
 func (s *Simulator) simulateGetFeed(context actor.Context) {

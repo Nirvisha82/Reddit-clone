@@ -46,6 +46,8 @@ func (e *Engine) Receive(context actor.Context) {
 		e.vote(msg.PostID, msg.UserID, msg.IsUpvote)
 	case *SendDirectMessage:
 		e.sendDirectMessage(msg.From, msg.To, msg.Content)
+	case *SharePostViaDirectMessage:
+		e.sharePostViaDirectMessage(msg.From, msg.To, msg.PostID)
 	case *GetFeed:
 		e.getFeed(msg.Username)
 	case *GetSimulationStats:
@@ -185,6 +187,30 @@ func (e *Engine) sendDirectMessage(from, to, content string) {
 			//fmt.Printf("[Direct Message] DM sent from %s to %s: %s\n", from, to, content)
 			log_str := fmt.Sprintf("[Direct Message] DM sent to %s: %s", to, content)
 			e.logUserAction(from, log_str)
+		}
+	}
+}
+
+func (e *Engine) sharePostViaDirectMessage(from, to, postID string) {
+	if fromUser, exists := e.users[from]; exists {
+		if toUser, exists := e.users[to]; exists {
+			if post, postExists := e.posts[postID]; postExists {
+				// Create a message that includes the shared post
+				message := &DirectMessage{
+					From:       from,
+					To:         to,
+					Content:    fmt.Sprintf("Check out this post: %s", post.Title),
+					SharedPost: post,
+				}
+				fromUser.SentMessages = append(fromUser.SentMessages, message)
+				toUser.ReceivedMessages = append(toUser.ReceivedMessages, message)
+				
+				log_str := fmt.Sprintf("[SHARE POST]     %s shared post '%s' (ID: %s) with %s", from, post.Title, postID, to)
+				e.logUserAction(from, log_str)
+				
+				log_str = fmt.Sprintf("[RECEIVED SHARE] Received shared post '%s' from %s", post.Title, from)
+				e.logUserAction(to, log_str)
+			}
 		}
 	}
 }

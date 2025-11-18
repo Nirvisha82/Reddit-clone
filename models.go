@@ -37,4 +37,11 @@ type DirectMessage struct {
 	From    string
 	To      string
 	Content string
+	SharedPost *Post
+}
+
+type SharedPostMessage struct {
+	From   string
+	To     string
+	PostID string
 }
